@@ -41,6 +41,8 @@ fun QuizScreen(
     val answers = remember { mutableStateMapOf<Int, Pair<String?, Boolean>>() }
     val savedQuestions = remember { mutableStateListOf<Question>() }
     val bookmarkedStates = remember { mutableStateMapOf<Int, Boolean>() }
+    val bookmarkedQuestions = remember { mutableStateListOf<Question>() }
+
 
     LaunchedEffect(subject) {
         firestoreHelper.getQuestions(
@@ -147,6 +149,18 @@ fun QuizScreen(
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
+                        LaunchedEffect(showResult) {
+                            if (showResult) {
+                                firestoreHelper.getBookmarkedQuestions(
+                                    onSuccess = { fetched ->
+                                        bookmarkedQuestions.clear()
+                                        bookmarkedQuestions.addAll(fetched)
+                                    },
+                                    onFailure = { Log.e("QuizScreen", "Bookmark yüklenemedi: ${it.message}") }
+                                )
+                            }
+                        }
+
                     Column(modifier = Modifier.fillMaxWidth()) {
                         // Kaydedilen soruları önceden kontrol et
                         LaunchedEffect(Unit) {
@@ -196,19 +210,8 @@ fun QuizScreen(
                                 ) {
                                     IconButton(
                                         onClick = {
-                                            val isBookmarked = bookmarkedStates[index] ?: false
-                                            if (!isBookmarked) {
-                                                firestoreHelper.saveBookmarkedQuestion(
-                                                    subject = subject,
-                                                    question = question.copy(testId = testId),
-                                                    onSuccess = {
-                                                        bookmarkedStates[index] = true
-                                                        Log.d("QuizScreen", "Soru kaydedildi: ${question.question}")
-                                                    },
-                                                    onFailure = {
-                                                        Log.e("QuizScreen", "Kaydetme hatası: ${it.message}")
-                                                    }
-                                                )
+                                            val isBookmarked = bookmarkedQuestions.any {
+                                                it.question == question.question && it.testId == question.testId
                                             }
                                         }
                                     ) {
@@ -220,6 +223,7 @@ fun QuizScreen(
                                             contentDescription = "Kaydet",
                                             tint = if (bookmarkedStates[index] == true) Color(0xFF1976D2) else Color.Gray
                                         )
+
                                     }
                                 }
                             }
