@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "507629147089",
+    "project_id": "ekpssquizapp-3987b",
+    "storage_bucket": "ekpssquizapp-3987b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:507629147089:android:15504af6bf79d9e728c6f0",
+        "android_client_info": {
+          "package_name": "com.ekpss.quizapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "507629147089-rvusaobi9lb35e8mq6li3sbtd0ijt4f4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ekpss.quizapp",
+            "certificate_hash": "2879f64667f1c40e33bcded3f69e0aad7fe5d51f"
+          }
+        },
+        {
+          "client_id": "507629147089-gq6l22ka9mjtm2n2klqgt1ld1o5ef4q9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArHsQ8Uf4LFh1DH4-QY9dIbkzQbnOjB4c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "507629147089-gq6l22ka9mjtm2n2klqgt1ld1o5ef4q9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
