@@ -6,6 +6,9 @@ import com.ekpss.quizapp.model.Question
 import com.ekpss.quizapp.model.Test
 import com.ekpss.quizapp.utils.Constants
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resumeWithException
+import android.util.Log
 
 class FirestoreHelper {
 
@@ -78,73 +81,24 @@ class FirestoreHelper {
             }
     }
 
-    fun saveBookmarkedQuestion(
-        subject: String,
-        question: Question,
-        onSuccess: () -> Unit,
-        onFailure: (Exception) -> Unit
-    ) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
-        val bookmarksRef = db.collection("users")
-            .document(userId)
-            .collection("bookmarks")
-
-        // 1. Önce daha önce kaydedilmiş mi kontrol et
-        bookmarksRef
-            .whereEqualTo("question", question.question)
-            .whereEqualTo("testId", question.testId)
-            .get()
-            .addOnSuccessListener { result ->
-                if (result.isEmpty) {
-                    // 2. Yoksa kaydet
-                    val data = hashMapOf(
-                        "question" to question.question,
-                        "options" to question.options,
-                        "answer" to question.answer,
-                        "testId" to question.testId,
-                        "subject" to subject
-                    )
-                    bookmarksRef.add(data)
-                        .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { e -> onFailure(e) }
-                } else {
-                    // 3. Zaten varsa tekrar ekleme
-                    onSuccess() // veya ayrı mesaj gösterilebilir
-                }
-            }
-            .addOnFailureListener { e -> onFailure(e) }
-    }
-
-
-    fun getBookmarkedQuestionsBySubject(
-        subject: String,
-        onSuccess: (List<Question>) -> Unit,
-        onFailure: (Exception) -> Unit
-    ) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
-        db.collection("users")
-            .document(userId)
-            .collection("bookmarks")
-            .whereEqualTo("subject", subject)
-            .get()
-            .addOnSuccessListener { result ->
-                val questions = result.mapNotNull { it.toObject(Question::class.java) }
-                onSuccess(questions)
-            }
-            .addOnFailureListener { onFailure(it) }
-    }
-
     fun getBookmarkedQuestions(
-        userId: String = "default_user",
         onSuccess: (List<Question>) -> Unit,
         onFailure: (Exception) -> Unit
     ) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
         db.collection("users")
             .document(userId)
             .collection("bookmarks")
             .get()
             .addOnSuccessListener { result ->
-                val questions = result.map { it.toObject(Question::class.java) }
+                val questions = result.mapNotNull { doc ->
+                    try {
+                        doc.toObject(Question::class.java)
+                    } catch (e: Exception) {
+                        Log.e("FirestoreHelper", "Soru dönüştürme hatası: ${e.message}")
+                        null
+                    }
+                }
                 onSuccess(questions)
             }
             .addOnFailureListener { e ->
@@ -152,6 +106,40 @@ class FirestoreHelper {
             }
     }
 
+    fun saveBookmarkedQuestion(
+        subject: String,
+        question: Question,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
+        db.collection("users")
+            .document(userId)
+            .collection("bookmarks")
+            .whereEqualTo("question", question.question)
+            .whereEqualTo("testId", question.testId)
+            .get()
+            .addOnSuccessListener { result ->
+                if (result.isEmpty) {
+                    val data = hashMapOf(
+                        "question" to question.question,
+                        "options" to question.options,
+                        "answer" to question.answer,
+                        "testId" to question.testId,
+                        "subject" to subject
+                    )
+                    db.collection("users")
+                        .document(userId)
+                        .collection("bookmarks")
+                        .add(data)
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { onFailure(it) }
+                } else {
+                    onSuccess()
+                }
+            }
+            .addOnFailureListener { onFailure(it) }
+    }
 
     fun deleteBookmarkedQuestion(
         subject: String,
@@ -160,7 +148,6 @@ class FirestoreHelper {
         onFailure: (Exception) -> Unit
     ) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
-
         db.collection("users")
             .document(userId)
             .collection("bookmarks")
@@ -179,46 +166,22 @@ class FirestoreHelper {
             .addOnFailureListener { onFailure(it) }
     }
 
-    fun deleteBookmarkedQuestionByFields(
+    fun getBookmarkedQuestionsBySubject(
         subject: String,
-        question: Question,
-        onSuccess: () -> Unit,
+        onSuccess: (List<Question>) -> Unit,
         onFailure: (Exception) -> Unit
     ) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "default_user"
-
         db.collection("users")
             .document(userId)
             .collection("bookmarks")
-            .whereEqualTo("question", question.question)
-            .whereEqualTo("testId", question.testId)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val batch = db.batch()
-                snapshot.documents.forEach { doc -> batch.delete(doc.reference) }
-                batch.commit().addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { onFailure(it) }
-            }
-            .addOnFailureListener { onFailure(it) }
-    }
-
-    fun isQuestionBookmarked(
-        userId: String = "default_user",
-        question: Question,
-        callback: (Boolean) -> Unit
-    ) {
-        db.collection("users")
-            .document(userId)
-            .collection("bookmarks")
-            .whereEqualTo("question", question.question)
-            .whereEqualTo("testId", question.testId)
+            .whereEqualTo("subject", subject)
             .get()
             .addOnSuccessListener { result ->
-                callback(!result.isEmpty)
+                val questions = result.mapNotNull { it.toObject(Question::class.java) }
+                onSuccess(questions)
             }
-            .addOnFailureListener {
-                callback(false)
-            }
+            .addOnFailureListener { onFailure(it) }
     }
 
 }

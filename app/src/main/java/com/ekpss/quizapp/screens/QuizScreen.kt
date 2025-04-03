@@ -24,6 +24,8 @@ import com.ekpss.quizapp.model.Question
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.painterResource
 import com.ekpss.quizapp.R
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -42,7 +44,26 @@ fun QuizScreen(
     val savedQuestions = remember { mutableStateListOf<Question>() }
     val bookmarkedStates = remember { mutableStateMapOf<Int, Boolean>() }
     val bookmarkedQuestions = remember { mutableStateListOf<Question>() }
+    var isLoadingResults by remember { mutableStateOf(false) }
 
+    // Bookmark durumlarını güncelleyen fonksiyon
+    fun updateBookmarkStates() {
+        firestoreHelper.getBookmarkedQuestions(
+            onSuccess = { bookmarked ->
+                bookmarkedQuestions.clear()
+                bookmarkedQuestions.addAll(bookmarked)
+                questions.forEachIndexed { index, question ->
+                    val isBookmarked = bookmarked.any {
+                        it.question == question.question && it.testId == testId
+                    }
+                    bookmarkedStates[index] = isBookmarked
+                }
+            },
+            onFailure = {
+                Log.e("QuizScreen", "Bookmark durumları yüklenemedi: ${it.message}")
+            }
+        )
+    }
 
     LaunchedEffect(subject) {
         firestoreHelper.getQuestions(
@@ -50,22 +71,8 @@ fun QuizScreen(
             testId = testId,
             onSuccess = { fetchedQuestions ->
                 questions = fetchedQuestions
-
-                // Kullanıcının kaydettiği tüm soruları al
-                firestoreHelper.getBookmarkedQuestions(
-                    userId = "default_user",
-                    onSuccess = { bookmarkedList ->
-                        fetchedQuestions.forEachIndexed { index, question ->
-                            val isBookmarked = bookmarkedList.any {
-                                it.question == question.question && it.testId == testId
-                            }
-                            bookmarkedStates[index] = isBookmarked
-                        }
-                    },
-                    onFailure = {
-                        Log.e("QuizScreen", "Bookmark kontrolü başarısız: ${it.message}")
-                    }
-                )
+                // Sorular yüklendiğinde bookmark durumlarını da yükle
+                updateBookmarkStates()
             },
             onFailure = {
                 Log.e("QuizScreen", "Soru çekilemedi: ${it.message}")
@@ -73,11 +80,31 @@ fun QuizScreen(
         )
     }
 
+    // Test sonuçları gösterildiğinde bookmark durumlarını güncelle
+    LaunchedEffect(showResult) {
+        if (showResult) {
+            firestoreHelper.getBookmarkedQuestions(
+                onSuccess = { bookmarked ->
+                    bookmarkedQuestions.clear()
+                    bookmarkedQuestions.addAll(bookmarked)
+                    questions.forEachIndexed { index, question ->
+                        bookmarkedStates[index] = bookmarked.any {
+                            it.question == question.question && it.testId == testId
+                        }
+                    }
+                },
+                onFailure = { error ->
+                    Log.e("QuizScreen", "Bookmark durumları yüklenemedi: ${error.message}")
+                }
+            )
+        }
+    }
+
     fun saveQuestionToFirestore(subject: String, question: Question) {
         firestoreHelper.saveBookmarkedQuestion(
             subject = subject,
             question = question.copy(testId = testId),
-            onSuccess = { Log.d("QuizScreen", "Soru kaydedildi: ${question.question}") },
+            onSuccess = {},
             onFailure = { Log.e("QuizScreen", "Soru kaydedilemedi: ${it.message}") }
         )
     }
@@ -110,127 +137,247 @@ fun QuizScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(resultColor.copy(alpha = 0.1f))
-                        .padding(8.dp),
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Test Bitti!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = when {
+                            percentage >= 80 -> "Harika! 🎉"
+                            percentage >= 50 -> "İyi! 👍"
+                            else -> "Biraz Daha Çalışmalısın 💪"
+                        },
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = resultColor
+                    )
+                    
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Puanın: $score / ${questions.size} ($percentage%)", fontSize = 16.sp)
-
-                    LinearProgressIndicator(
-                        progress = percentage / 100f,
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        color = resultColor
-                    )
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "Sonuçlar",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "$score / ${questions.size}",
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = resultColor
+                            )
+                            Text(
+                                "(%$percentage)",
+                                fontSize = 18.sp,
+                                color = resultColor
+                            )
+                            
+                            LinearProgressIndicator(
+                                progress = percentage / 100f,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .height(8.dp),
+                                color = resultColor
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Button(onClick = {
-                            currentIndex = 0
-                            answers.clear()
-                            savedQuestions.clear()
-                            showResult = false
-                        }) {
+                        Button(
+                            onClick = {
+                                currentIndex = 0
+                                answers.clear()
+                                savedQuestions.clear()
+                                showResult = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
                             Text("Yeniden Dene")
                         }
-                        Button(onClick = onNavigateHome) {
+                        Button(
+                            onClick = onNavigateHome,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
                             Text("Ana Sayfa")
                         }
-
-                        Button(onClick = { onNavigateSavedQuestions() }) {
-                            Text("Kaydedilen Sorular")
-                        }
-
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
-                        LaunchedEffect(showResult) {
-                            if (showResult) {
-                                firestoreHelper.getBookmarkedQuestions(
-                                    onSuccess = { fetched ->
-                                        bookmarkedQuestions.clear()
-                                        bookmarkedQuestions.addAll(fetched)
-                                    },
-                                    onFailure = { Log.e("QuizScreen", "Bookmark yüklenemedi: ${it.message}") }
-                                )
-                            }
+                    Text(
+                        "Soru Detayları",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (isLoadingResults) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
                         }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            items(questions.size) { index ->
+                                val question = questions[index]
+                                val (selected, shown) = answers[index] ?: (null to false)
+                                val isCorrect = selected == question.answer
 
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        // Kaydedilen soruları önceden kontrol et
-                        LaunchedEffect(Unit) {
-                            firestoreHelper.getBookmarkedQuestions(
-                                onSuccess = { bookmarkedQuestions ->
-                                    questions.forEachIndexed { index, question ->
-                                        val isBookmarked = bookmarkedQuestions.any {
-                                            it.question == question.question && it.testId == testId
-                                        }
-                                        bookmarkedStates[index] = isBookmarked
-                                    }
-                                },
-                                onFailure = {
-                                    Log.e("QuizScreen", "Bookmarked sorular alınamadı: ${it.message}")
-                                }
-                            )
-                        }
-
-                        questions.forEachIndexed { index, question ->
-                            val (selected, shown) = answers[index] ?: (null to false)
-                            val isCorrect = selected == question.answer
-
-                            Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                                Text("${index + 1}. ${question.question}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    text = "Senin cevabın: ${selected ?: "Boş"}" +
-                                            if (shown && selected != null) {
-                                                if (isCorrect) "  ✔" else "  ✘"
-                                            } else "",
-                                    color = when {
-                                        selected == null -> Color.Gray
-                                        isCorrect -> Color(0xFF388E3C)
-                                        else -> Color(0xFFD32F2F)
-                                    },
-                                    fontWeight = FontWeight.Medium
-                                )
-                                if (shown && selected != question.answer) {
-                                    Text("Doğru cevap: ${question.answer} ✔", color = Color(0xFF1976D2))
-                                }
-
-                                // 🔖 Kaydet ikonunu göster (IconButton ile)
-                                Row(
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 4.dp),
-                                    horizontalArrangement = Arrangement.End
+                                        .padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when {
+                                            isCorrect -> Color(0xFFE8F5E9)  // Açık yeşil
+                                            selected != null -> Color(0xFFFFEBEE)  // Açık kırmızı
+                                            else -> MaterialTheme.colorScheme.surface
+                                        }
+                                    )
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            val isBookmarked = bookmarkedQuestions.any {
-                                                it.question == question.question && it.testId == question.testId
+                                    Column(
+                                        modifier = Modifier.padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${index + 1}. Soru",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    val isCurrentlyBookmarked = bookmarkedStates[index] == true
+                                                    if (isCurrentlyBookmarked) {
+                                                        firestoreHelper.deleteBookmarkedQuestion(
+                                                            subject = subject,
+                                                            question = question,
+                                                            onSuccess = {
+                                                                bookmarkedStates[index] = false
+                                                                bookmarkedQuestions.removeAll { it.question == question.question && it.testId == testId }
+                                                            },
+                                                            onFailure = {
+                                                                Log.e("QuizScreen", "Soru silinemedi: ${it.message}")
+                                                            }
+                                                        )
+                                                    } else {
+                                                        firestoreHelper.saveBookmarkedQuestion(
+                                                            subject = subject,
+                                                            question = question,
+                                                            onSuccess = {
+                                                                bookmarkedStates[index] = true
+                                                                bookmarkedQuestions.add(question)
+                                                            },
+                                                            onFailure = {
+                                                                Log.e("QuizScreen", "Soru kaydedilemedi: ${it.message}")
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            ) {
+                                                val isBookmarked = bookmarkedStates[index] == true
+                                                Icon(
+                                                    painter = painterResource(
+                                                        id = if (isBookmarked) R.drawable.bookmark_added 
+                                                            else R.drawable.bookmark_add
+                                                    ),
+                                                    contentDescription = if (isBookmarked)
+                                                        "Kaydedildi" else "Kaydet",
+                                                    tint = if (isBookmarked)
+                                                        Color(0xFF1976D2) else Color.Gray
+                                                )
                                             }
                                         }
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(
-                                                id = if (bookmarkedStates[index] == true)
-                                                    R.drawable.bookmark_added else R.drawable.bookmark_add
-                                            ),
-                                            contentDescription = "Kaydet",
-                                            tint = if (bookmarkedStates[index] == true) Color(0xFF1976D2) else Color.Gray
+                                        
+                                        Text(
+                                            question.question,
+                                            fontSize = 14.sp,
+                                            modifier = Modifier.padding(vertical = 4.dp)
                                         )
 
+                                        // Seçenekler
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            question.options.forEach { option ->
+                                                val isCorrectOption = option == question.answer
+                                                val isSelectedOption = option == selected
+                                                
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 2.dp),
+                                                    horizontalArrangement = Arrangement.Start,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        painter = painterResource(
+                                                            id = when {
+                                                                isCorrectOption -> R.drawable.check_circle
+                                                                isSelectedOption -> R.drawable.cancel
+                                                                else -> R.drawable.check_circle
+                                                            }
+                                                        ),
+                                                        contentDescription = when {
+                                                            isCorrectOption -> "Doğru Cevap"
+                                                            isSelectedOption -> "Yanlış Cevap"
+                                                            else -> "Seçenek"
+                                                        },
+                                                        tint = when {
+                                                            isCorrectOption -> Color(0xFF388E3C)
+                                                            isSelectedOption -> Color(0xFFD32F2F)
+                                                            else -> Color.Gray
+                                                        },
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = option,
+                                                        color = when {
+                                                            isCorrectOption -> Color(0xFF388E3C)
+                                                            isSelectedOption -> Color(0xFFD32F2F)
+                                                            else -> Color.Gray
+                                                        },
+                                                        fontSize = 14.sp
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
-
-                            Divider(modifier = Modifier.padding(vertical = 4.dp))
                         }
-
                     }
                 }
             } else {

@@ -1,3 +1,5 @@
+package com.ekpss.quizapp.screens
+
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,15 +12,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import com.airbnb.lottie.compose.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.airbnb.lottie.compose.*
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import androidx.compose.material3.MaterialTheme
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
@@ -59,26 +62,34 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Text(
+            text = "EKPSS",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
         LottieAnimation(
             composition,
             progress,
             modifier = Modifier
-                .height(250.dp)
-        )
+                .weight(1f)
+                .padding(vertical = 32.dp)
+            )
 
-        Text(
-            text = "EKPSS QuizApp",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-
-        Button(onClick = {
-            launcher.launch(signInClient.signInIntent)
-        }) {
+        Button(
+            onClick = {
+                launcher.launch(signInClient.signInIntent)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
             Text("Google ile Giriş Yap")
         }
     }
