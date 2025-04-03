@@ -5,17 +5,20 @@ import androidx.compose.runtime.*
 import com.ekpss.quizapp.ui.theme.EkpssQuizAppTheme
 
 @Composable
-fun MainAppContent() {
+fun MainAppContent(onLogout: () -> Unit = {}) {
     EkpssQuizAppTheme {
         var currentScreen by remember { mutableStateOf("subjectList") }
         var selectedSubject by remember { mutableStateOf<String?>(null) }
         var selectedTest by remember { mutableStateOf<String?>(null) }
 
         when (currentScreen) {
-            "subjectList" -> SubjectListScreen { subject ->
-                selectedSubject = subject
-                currentScreen = "subjectDetail"
-            }
+            "subjectList" -> SubjectListScreen(
+                onSubjectClick = { subject ->
+                    selectedSubject = subject
+                    currentScreen = "subjectDetail"
+                },
+                onLogout = onLogout
+            )
 
             "subjectDetail" -> SubjectDetailScreen(
                 subject = selectedSubject!!,

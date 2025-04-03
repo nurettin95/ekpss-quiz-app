@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,11 +19,42 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ekpss.quizapp.R
 import com.ekpss.quizapp.utils.Constants
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SubjectListScreen(onSubjectClick: (String) -> Unit) {
+fun SubjectListScreen(
+    onSubjectClick: (String) -> Unit,
+    onLogout: () -> Unit
+) {
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Text(
+                        text = "EKPSS DERSLERİ",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            onLogout()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Çıkış Yap",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            )
+        },
         bottomBar = {
             Box(
                 modifier = Modifier
@@ -35,34 +67,12 @@ fun SubjectListScreen(onSubjectClick: (String) -> Unit) {
             }
         }
     ) { paddingValues ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF6F9FC))
                 .padding(paddingValues)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 24.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.book),
-                    contentDescription = "Okul İkonu",
-                    tint = Color(0xFF1976D2),
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "EKPSS DERSLERİ",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
-                )
-            }
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()

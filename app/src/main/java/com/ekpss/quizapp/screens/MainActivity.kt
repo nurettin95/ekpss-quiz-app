@@ -13,14 +13,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             EkpssQuizAppTheme {
-
-                // Firebase'den mevcut kullanıcıyı kontrol et
                 var isLoggedIn by remember {
                     mutableStateOf(FirebaseAuth.getInstance().currentUser != null)
                 }
 
                 if (isLoggedIn) {
-                    MainAppContent()
+                    MainAppContent(
+                        onLogout = {
+                            isLoggedIn = false
+                        }
+                    )
                 } else {
                     LoginScreen {
                         isLoggedIn = true
